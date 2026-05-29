@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Datasheet VLM Parameter Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="glow-orb" id="orb-1"></div>
+    <div class="glow-orb" id="orb-2"></div>
+
+    <main class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="logo-icon">✦</span>
+                <h1>AI Datasheet VLM Extractor</h1>
+            </div>
+            <p class="subtitle">利用 Gemini 2.5 Flash 多模態視覺語言模型 (VLM) 精準解析物理尺寸圖面與電子規格數值</p>
+        </header>
+
+        <!-- Main Workspace -->
+        <section class="workspace">
+            <!-- Left Panel: Actions & Upload -->
+            <div class="panel upload-panel">
+                <div class="card glass-card">
+                    <h2 class="card-title">上傳規格書 PDF</h2>
+                    <p class="card-desc">支援點擊或直接拖曳 PDF 檔案進行即時 VLM 分析</p>
+                    
+                    <div class="drop-zone" id="drop-zone">
+                        <div class="drop-zone-content">
+                            <div class="upload-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <span class="drop-text">拖曳 PDF 檔案至此或</span>
+                            <label for="file-input" class="btn btn-primary btn-upload">選擇檔案</label>
+                            <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="file-details" id="file-details" style="display: none;">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name" id="selected-file-name">filename.pdf</span>
+                        <button class="btn-clear" id="btn-clear-file">✕</button>
+                    </div>
+
+                    <button class="btn btn-action" id="btn-extract" disabled>開始 AI 視覺特徵提取</button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Result & Status -->
+            <div class="panel result-panel">
+                <!-- Idle State -->
+                <div class="card glass-card state-card active" id="state-idle">
+                    <div class="empty-state">
+                        <span class="empty-icon">📊</span>
+                        <h3>等待資料輸入</h3>
+                        <p>在上傳面板中選擇或拖入規格書，點擊「開始 AI 視覺特徵提取」即可看到結構化電子參數報告。</p>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div class="card glass-card state-card" id="state-loading">
+                    <div class="loader-container">
+                        <div class="spinner">
+                            <div class="double-bounce1"></div>
+                            <div class="double-bounce2"></div>
+                        </div>
+                        <h3 id="loading-status">正在上傳並解析檔案...</h3>
+                        <p class="loader-tip">模型正在辨識封裝尺寸圖、引腳、極限工作溫度以及各項電壓電流特性...</p>
+                        
+                        <div class="progress-steps">
+                            <div class="step active" id="step-render">頁面光柵化轉換</div>
+                            <div class="step-line"></div>
+                            <div class="step" id="step-vlm">VLM 視覺神經解析</div>
+                            <div class="step-line"></div>
+                            <div class="step" id="step-schema">結構化 JSON 輸出</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div class="card glass-card state-card" id="state-error">
+                    <div class="error-container">
+                        <span class="error-icon">⚠️</span>
+                        <h3>參數提取失敗</h3>
+                        <p id="error-message">錯誤訊息描述</p>
+                        <button class="btn btn-secondary" id="btn-retry">重試上傳</button>
+                    </div>
+                </div>
+
+                <!-- Result State -->
+                <div class="card glass-card state-card" id="state-results">
+                    <div class="results-header">
+                        <h2 class="card-title">提取結果參數面板</h2>
+                        <div class="action-row">
+                            <button class="btn btn-secondary btn-sm" id="btn-download-json">下載 JSON</button>
+                        </div>
+                    </div>
+                    
+                    <div class="result-details">
+                        <div class="meta-info">
+                            <span class="meta-tag" id="tag-filename">檔名: BAS16.pdf</span>
+                            <span class="meta-tag highlight" id="tag-partnumber">型號: BAS16</span>
+                            <span class="meta-tag success" id="tag-pin">引腳數: 3 Pins</span>
+                        </div>
+
+                        <div class="results-table-container">
+                            <table class="results-table" id="result-table">
+                                <thead>
+                                    <tr>
+                                        <th>擷取欄位</th>
+                                        <th>VLM 物理與電性參數擷取值</th>
+                                        <th>類型說明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="col-name">Part Number</td>
+                                        <td class="col-value" id="val-part_number">-</td>
+                                        <td class="col-desc">元件品號</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">Minimum Operating Temperature(°C)</td>
+                                        <td class="col-value" id="val-min_operating_temp_c">-</td>
+                                        <td class="col-desc">工作溫度最小值</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">Maximum Operating Temperature (°C)</td>
+                                        <td class="col-value" id="val-max_operating_temp_c">-</td>
+                                        <td class="col-desc">工作溫度最大值</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">Maximum Length (mm)</td>
+                                        <td class="col-value" id="val-max_length_mm">-</td>
+                                        <td class="col-desc">包含接腳最大長度</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">Maximum Width (mm)</td>
+                                        <td class="col-value" id="val-max_width_mm">-</td>
+                                        <td class="col-desc">包含接腳最大寬度</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">Maximum Height (mm)</td>
+                                        <td class="col-value" id="val-max_height_mm">-</td>
+                                        <td class="col-desc">最大本體高度</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">PIN Number</td>
+                                        <td class="col-value" id="val-pin_number">-</td>
+                                        <td class="col-desc">引腳數量</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">I_O、I_F (A)</td>
+                                        <td class="col-value" id="val-io_if_a">-</td>
+                                        <td class="col-desc">平均整流或正向電流</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">V_F(Forward Voltage) (V)</td>
+                                        <td class="col-value highlight-cell" id="val-vf_v">-</td>
+                                        <td class="col-desc">正向電壓各條件列表 (U+3001 '、' 分隔)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">V_RRM(Peak Repetitive Reverse Voltage) (V)</td>
+                                        <td class="col-value" id="val-vrrm_v">-</td>
+                                        <td class="col-desc">反向重複峰值電壓</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-name">I_R(Reverse Current)</td>
+                                        <td class="col-value highlight-cell" id="val-ir_a">-</td>
+                                        <td class="col-desc">反向電流各條件列表 (U+3001 '、' 分隔)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
